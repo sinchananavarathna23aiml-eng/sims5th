@@ -14,7 +14,7 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || 'your-secret-key-change-in-production';
+const JWT_SECRET = process.env.JWT_SECRET || '<REDACTED>'; // Do NOT commit real secrets
 const IS_VERCEL = !!process.env.VERCEL;
 const UPLOAD_DIR = IS_VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
 let mongoConnectionPromise = null;
