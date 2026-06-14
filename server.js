@@ -14,11 +14,16 @@ require('dotenv').config();
 
 const app = express();
 const PORT = process.env.PORT || 3000;
-const JWT_SECRET = process.env.JWT_SECRET || '<REDACTED>'; // Do NOT commit real secrets
+const DISABLE_MONGODB = process.env.DISABLE_MONGODB === 'true';
+const JWT_SECRET = process.env.JWT_SECRET;
 const IS_VERCEL = !!process.env.VERCEL;
 const UPLOAD_DIR = IS_VERCEL ? path.join('/tmp', 'uploads') : path.join(__dirname, 'uploads');
 let mongoConnectionPromise = null;
 let sampleDataInitPromise = null;
+
+if (!DISABLE_MONGODB && !JWT_SECRET) {
+    throw new Error('Missing JWT_SECRET. Add it to your .env file before starting the server.');
+}
 
 // ==================== MIDDLEWARE ====================
 app.use(cors()); // Enable CORS for all routes
@@ -56,7 +61,15 @@ if (!fs.existsSync(UPLOAD_DIR)) {
 // ==================== DATABASE CONNECTION ====================
 let MONGODB_URI = process.env.MONGODB_URI;
 
+if (!DISABLE_MONGODB && !MONGODB_URI) {
+    throw new Error('Missing MONGODB_URI. Add it to your .env file before starting the server.');
+}
+
 async function ensureMongoConnection() {
+    if (DISABLE_MONGODB) {
+        return;
+    }
+
     if (mongoose.connection.readyState === 1) {
         return;
     }
@@ -116,9 +129,11 @@ async function ensureSampleDataInitialized() {
 }
 
 // Kick off connection early to reduce first-request latency.
-ensureMongoConnection().catch(() => {
-    // Errors are handled per request and by connection event logs.
-});
+if (!DISABLE_MONGODB) {
+    ensureMongoConnection().catch(() => {
+        // Errors are handled per request and by connection event logs.
+    });
+}
 
 // ==================== SCHEMAS ====================
 
@@ -227,7 +242,7 @@ app.get('/api/health', (req, res) => {
         status: 'ok',
         message: 'Server is running',
         timestamp: new Date().toISOString(),
-        database: mongoose.connection.readyState === 1 ? 'connected' : 'disconnected',
+        database: DISABLE_MONGODB ? 'disabled' : (mongoose.connection.readyState === 1 ? 'connected' : 'disconnected'),
         uptime: process.uptime()
     });
 });
@@ -236,6 +251,12 @@ app.get('/api/health', (req, res) => {
 app.use('/api', async (req, res, next) => {
     if (req.path === '/health') {
         return next();
+    }
+
+    if (DISABLE_MONGODB) {
+        return res.status(503).json({
+            error: 'MongoDB is disabled for this deployment. Set DISABLE_MONGODB=false and configure MONGODB_URI to enable API routes.'
+        });
     }
 
     try {
@@ -318,8 +339,7 @@ app.post('/api/auth/login', async (req, res) => {
         if (!user) {
             console.log(`Login failed: User '${username}' not found or inactive`);
             return res.status(401).json({ 
-                error: 'Invalid username or password',
-                hint: 'Try demo/demo123 for quick access'
+                error: 'Invalid username or password'
             });
         }
 
@@ -328,8 +348,7 @@ app.post('/api/auth/login', async (req, res) => {
         if (!validPassword) {
             console.log(`Login failed: Invalid password for user '${username}'`);
             return res.status(401).json({ 
-                error: 'Invalid username or password',
-                hint: 'Try demo/demo123 for quick access'
+                error: 'Invalid username or password'
             });
         }
 
@@ -1415,27 +1434,27 @@ async function initializeSampleData() {
 
         console.log('📊 Creating sample data...');
 
-        // Create demo users
+        // Create generic seed users (override via environment variables if needed)
         const demoUsers = [
             {
-                username: 'demo',
-                password: await bcrypt.hash('demo123', 10),
-                fullName: 'Demo User',
-                email: 'demo@inventory.com',
+                username: process.env.SEED_ADMIN_USERNAME || 'admin',
+                password: await bcrypt.hash(process.env.SEED_ADMIN_PASSWORD || 'ChangeMeAdmin123!', 10),
+                fullName: process.env.SEED_ADMIN_NAME || 'Admin User',
+                email: process.env.SEED_ADMIN_EMAIL || 'admin@example.com',
                 role: 'admin'
             },
             {
-                username: 'manager',
-                password: await bcrypt.hash('manager123', 10),
-                fullName: 'Manager User',
-                email: 'manager@inventory.com',
+                username: process.env.SEED_MANAGER_USERNAME || 'manager',
+                password: await bcrypt.hash(process.env.SEED_MANAGER_PASSWORD || 'ChangeMeManager123!', 10),
+                fullName: process.env.SEED_MANAGER_NAME || 'Manager User',
+                email: process.env.SEED_MANAGER_EMAIL || 'manager@example.com',
                 role: 'manager'
             },
             {
-                username: 'user',
-                password: await bcrypt.hash('user123', 10),
-                fullName: 'Regular User',
-                email: 'user@inventory.com',
+                username: process.env.SEED_USER_USERNAME || 'user',
+                password: await bcrypt.hash(process.env.SEED_USER_PASSWORD || 'ChangeMeUser123!', 10),
+                fullName: process.env.SEED_USER_NAME || 'Regular User',
+                email: process.env.SEED_USER_EMAIL || 'user@example.com',
                 role: 'user'
             }
         ];
@@ -1515,6 +1534,11 @@ if (require.main === module) {
         console.log(`🚀 Server running on http://localhost:${PORT}`);
         console.log(`📡 API endpoints available at http://localhost:${PORT}/api`);
 
+        if (DISABLE_MONGODB) {
+            console.log('🛑 MongoDB mode: disabled (set DISABLE_MONGODB=false to reconnect)');
+            return;
+        }
+
         // Kick off sample-data initialization in background so server startup isn't blocked.
         (async () => {
             try {
@@ -1528,13 +1552,15 @@ if (require.main === module) {
     });
 } else {
     // Vercel/serverless path: ensure demo data exists for login flows.
-    (async () => {
-        try {
-            await ensureSampleDataInitialized();
-        } catch (err) {
-            console.error('❌ Sample data initialization error (serverless):', err.message || err);
-        }
-    })();
+    if (!DISABLE_MONGODB) {
+        (async () => {
+            try {
+                await ensureSampleDataInitialized();
+            } catch (err) {
+                console.error('❌ Sample data initialization error (serverless):', err.message || err);
+            }
+        })();
+    }
 }
 
 // Handle graceful shutdown

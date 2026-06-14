@@ -7,6 +7,16 @@
 
 ## 🚀 Quick Start
 
+### If Someone Wants To Connect Their Own Database
+
+1. Copy `.env.example` to `.env`
+2. Set `DISABLE_MONGODB=false`
+3. Set your own `MONGODB_URI`
+4. Set your own `JWT_SECRET`
+5. Run `npm start`
+
+The app will then connect to that person's MongoDB database.
+
 ### 1. Setup MongoDB Atlas
 
 1. Go to https://www.mongodb.com/cloud/atlas
@@ -44,9 +54,7 @@ The server will:
 
 Open your browser: **http://localhost:3000**
 
-**Login credentials:**
-- Username: `demo`
-- Password: `demo123`
+Create your own account from the **Create one here** link on the login page.
 
 ---
 
@@ -107,13 +115,11 @@ See `API_DOCUMENTATION.md` for full details.
 
 ---
 
-## 🔐 Demo Accounts
+## 🔐 Credentials & Secrets
 
-| Username | Password    | Role    |
-|----------|-------------|---------|
-| demo     | demo123     | Admin   |
-| manager  | manager123  | Manager |
-| user     | user123     | User    |
+- This repository does **not** include personal API keys or personal credentials.
+- Keep your real values only in `.env` (never commit `.env`).
+- Share `.env.example` as the template for other users.
 
 ---
 
@@ -146,9 +152,21 @@ Create/edit `.env` file:
 
 ```env
 MONGODB_URI=your_mongodb_connection_string
-JWT_SECRET=your_secret_key
+JWT_SECRET=your_long_random_secret
 PORT=3000
+DISABLE_MONGODB=false
+
+# Optional: customize initial seeded users
+SEED_ADMIN_USERNAME=admin
+SEED_ADMIN_PASSWORD=ChangeMeAdmin123!
+SEED_ADMIN_NAME=Admin User
+SEED_ADMIN_EMAIL=admin@example.com
 ```
+
+Recommended:
+- Use a long random value for `JWT_SECRET` (32+ chars).
+- Use your own MongoDB Atlas user/password in `MONGODB_URI`.
+- Set `DISABLE_MONGODB=true` if you want to temporarily run without any MongoDB connection.
 
 ---
 

@@ -128,11 +128,7 @@ async function handleLogin(e) {
 
     } catch (error) {
         console.error('Login error:', error);
-        let errorMsg = error.message;
-        if (!errorMsg.includes('Cannot connect to server')) {
-            errorMsg += ' (Try demo/demo123)';
-        }
-        showAlert('danger', errorMsg);
+        showAlert('danger', error.message);
     }
 }
 
@@ -1558,11 +1554,6 @@ function hideAllAlerts() {
             alert.remove();
         }
     });
-}
-
-function fillDemoCredentials() {
-    document.getElementById('username').value = 'demo';
-    document.getElementById('password').value = 'demo123';
 }
 
 function showRegisterForm() {
